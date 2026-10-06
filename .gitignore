@@ -23,10 +23,15 @@ dist/
 /data/student/
 /forecast/data/
 /forecast/model/
+/server/sensor_readings.sqlite3
+
+# PlatformIO build output
+/firmware/.pio/
 
 # Env / secrets
 .env
 .env.*
+/firmware/include/secrets.h
 
 # OS
 .DS_Store

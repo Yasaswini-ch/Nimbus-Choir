@@ -1,8 +1,8 @@
 # server
 
-FastAPI backend. Currently: `POST /predict` (the `/forecast` tension model).
-Later (Prompts 5/9): proxies/caches NASA GIBS tiles for Earth mode, and logs
-optional firmware sensor readings to SQLite.
+FastAPI backend. Currently: `POST /predict` (the `/forecast` tension model)
+and `POST /sensor` (the optional `/firmware` node's Wi-Fi path). Later
+(Prompt 9): proxies/caches NASA GIBS tiles for Earth mode.
 
 ## /predict
 Takes a camera cloud-type summary (`{cirrus, cumulus, stratus, cumulonimbus}`,
@@ -16,8 +16,19 @@ been trained yet (`forecast/train.py`), 502 if the weather lookup fails.
 falling back to a local JS rule (`/web/src/forecast/fallback.js`) if it's
 unreachable, so the app still gets *some* tension signal offline.
 
+## /sensor
+Takes one `/firmware` reading (`temp_c`, `humidity`, `pressure_hpa`,
+`pressure_trend_3h`, `wake_count`) and appends it to SQLite via `db.py` --
+the same store `sensor_logger.py` (the serial-reading path) writes to, so
+it doesn't matter which transport actually got through.
+
 ## Run
 ```
 pip install -r requirements.txt
 uvicorn app:app --reload
+```
+
+## Log the optional sensor node over serial
+```
+python sensor_logger.py --port COM3
 ```
