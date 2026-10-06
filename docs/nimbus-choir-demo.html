@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nimbus Choir</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&family=Quicksand:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg1:#f3ebfb;--bg2:#fde6ec;--ink:#3b3358;--mute:#7a6f99;--line:rgba(130,105,180,.25);--glass:rgba(255,255,255,.55);--acc:#8a6fd1;--glow:rgba(150,120,220,.4);
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg1:#171233;--bg2:#2a1d48;--ink:#efe9ff;--mute:#b3a8d6;--line:rgba(190,170,255,.2);--glass:rgba(255,255,255,.07);--acc:#b9a3ff;--glow:rgba(140,110,230,.35)}}
+:root[data-theme="dark"]{--bg1:#171233;--bg2:#2a1d48;--ink:#efe9ff;--mute:#b3a8d6;--line:rgba(190,170,255,.2);--glass:rgba(255,255,255,.07);--acc:#b9a3ff;--glow:rgba(140,110,230,.35)}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+*{box-sizing:border-box}
+body{margin:0;min-height:100%;background:var(--bg2);background:linear-gradient(180deg,var(--bg1),var(--bg2)) fixed;color:var(--ink);font:500 16px/1.6 Quicksand,"Avenir Next",system-ui,sans-serif}
+main{max-width:720px;margin:0 auto;padding:28px 16px 48px}
+h1{font:italic 300 clamp(2.4rem,9vw,3.4rem)/1.05 Fraunces,"Iowan Old Style",Georgia,serif;margin:0 0 8px;letter-spacing:-.02em}
+p.sub{margin:0 0 20px;color:var(--mute);max-width:46ch;font-size:1.02rem}
+.stage{position:relative;border-radius:28px;overflow:hidden;background:#2b2250;box-shadow:0 24px 70px var(--glow)}
+canvas{display:block;width:100%;aspect-ratio:4/3;touch-action:none}
+#go{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(60,40,110,.35);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:0;color:#fff;font:italic 300 1.7rem Fraunces,Georgia,serif;cursor:pointer;width:100%}
+#go:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--acc);outline-offset:3px}
+.panel,.legend{margin-top:16px;padding:18px;border-radius:24px;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.panel{display:grid;gap:16px;grid-template-columns:1fr 1fr}
+@media(max-width:520px){.panel{grid-template-columns:1fr}}
+label{display:block;font-size:.92rem;color:var(--mute)}
+label b{color:var(--ink);font-weight:600}
+input[type=range]{width:100%;margin-top:6px;accent-color:var(--acc)}
+select{width:100%;margin-top:6px;padding:10px 12px;background:var(--glass);color:var(--ink);border:1px solid var(--line);border-radius:14px;font:inherit}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+button.b{padding:10px 18px;background:var(--glass);color:var(--ink);border:1px solid var(--line);border-radius:999px;font:inherit;cursor:pointer}
+button.b:hover{border-color:var(--acc)}
+.legend{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:.92rem;color:var(--mute)}
+.legend span:nth-child(odd){color:var(--ink);font:italic 400 1.05rem Fraunces,Georgia,serif}
+</style>
+</head>
+<body>
+<main>
+<h1>Nimbus Choir</h1>
+<p class="sub">Every cloud hums a soft pad and drops chimes as it drifts. Type picks the timbre, height picks the note, position picks the ear. Put headphones on and look up.</p>
+<div class="stage">
+<canvas id="c" width="800" height="600"></canvas>
+<button id="go">Tap to wake the sky</button>
+</div>
+<div class="panel">
+<label>Tension: <b id="tv">0.00</b> (calm to front incoming)
+<input id="tension" type="range" min="0" max="1" step="0.01" value="0"></label>
+<label>Clouds: <b id="nv">5</b>
+<input id="count" type="range" min="1" max="8" step="1" value="5"></label>
+<label>Scale
+<select id="scale"><option value="penta">Pentatonic</option><option value="dorian">Dorian</option><option value="blues">Blues</option></select></label>
+<label>Root
+<select id="root"><option value="0">C</option><option value="2">D</option><option value="4">E</option><option value="7">G</option><option value="9">A</option></select></label>
+</div>
+<div class="row">
+<button class="b" id="storm">Storm front</button>
+<button class="b" id="calm">Clear skies</button>
+<button class="b" id="mute">Mute</button>
+</div>
+<div class="legend">
+<span>Cirrus</span><span>Glassy sine hum, quick high sparkles</span>
+<span>Cumulus</span><span>Warm round pad, music-box chimes</span>
+<span>Stratus</span><span>Deep hum, no chimes</span>
+<span>Cumulonimbus</span><span>Dark pad, slow low bells, louder as it grows</span>
+</div>
+</main>
+<script>
+(function(){
+const cv=document.getElementById('c'),g=cv.getContext('2d'),W=cv.width,H=cv.height;
+const $=id=>document.getElementById(id);
+const VOW={ooh:[300,870,2240],ah:[800,1150,2800],oh:[450,800,2830],mmm:[250,1000,2200]};
+const TYPES={
+ cirrus:{lo:72,hi:88,col:'#fff1fb',gain:.05,cut:3200},
+ cumulus:{lo:55,hi:72,col:'#fff8f0',gain:.08,cut:1500},
+ stratus:{lo:36,hi:43,col:'#d3c6ec',gain:.09,cut:420},
+ cumulonimbus:{lo:40,hi:55,col:'#9a8bc4',gain:.09,cut:650}};
+const SCALES={penta:[0,2,4,7,9],dorian:[0,2,3,5,7,9,10],blues:[0,3,5,6,7,10]};
+let ac,master,noiseBuf,muted=false,tension=0,nextId=1,clouds=[];
+
+function fAt(m){return 440*Math.pow(2,(m-69)/12)}
+function pool(lo,hi){
+ const sc=SCALES[$('scale').value],root=+$('root').value,calm=tension<.25;
+ const idx=calm?[0,2,4].map(i=>Math.min(i,sc.length-1)):sc.map((_,i)=>i);
+ const out=[];
+ for(let o=0;o<10;o++)for(const i of idx){const m=12*o+root+sc[i];if(m>=lo&&m<=hi)out.push(m)}
+ return out.length?out:[lo];
+}
+function noteFor(c){
+ const t=TYPES[c.type],p=pool(t.lo,t.hi),target=t.lo+(t.hi-t.lo)*c.y;
+ let best=p[0];for(const m of p)if(Math.abs(m-target)<Math.abs(best-target))best=m;
+ return best;
+}
+let rev;
+function mkReverb(){
+ const len=ac.sampleRate*3.2,b=ac.createBuffer(2,len,ac.sampleRate);
+ for(let ch=0;ch<2;ch++){const d=b.getChannelData(ch);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.6)}
+ const cn=ac.createConvolver();cn.buffer=b;return cn;
+}
+function mkVoice(c){
+ const t=TYPES[c.type],oscs=[],mix=ac.createGain();
+ const wave=c.type==='cirrus'?'sine':'triangle';
+ [-8,0,8].forEach(d=>{const o=ac.createOscillator();o.type=wave;o.detune.value=d;o.connect(mix);o.start();oscs.push(o)});
+ const up=ac.createOscillator();up.type='sine';const ug=ac.createGain();ug.gain.value=.25;up.connect(ug);ug.connect(mix);up.start();
+ const lp=ac.createBiquadFilter();lp.type='lowpass';lp.frequency.value=t.cut;lp.Q.value=2.5;
+ const trem=ac.createGain();trem.gain.value=1;
+ const lfo=ac.createOscillator(),lg=ac.createGain();lfo.frequency.value=.15+Math.random()*.25;lg.gain.value=.25;
+ lfo.connect(lg);lg.connect(trem.gain);lfo.start();
+ const out=ac.createGain();out.gain.value=0;const pan=ac.createStereoPanner();
+ mix.connect(lp);lp.connect(trem);trem.connect(out);out.connect(pan);pan.connect(master);
+ const send=ac.createGain();send.gain.value=.7;pan.connect(send);send.connect(rev);
+ const m=noteFor(c),f=fAt(m);oscs.forEach(o=>o.frequency.value=f);up.frequency.value=f*2;
+ c.v={oscs,up,out,pan,lfo,m,dis:[1,6,-1,6][c.id%4],dir:c.id%2?1:-1,next:ac.currentTime+1+Math.random()*3,all:[...oscs,up,lfo]};
+}
+function killVoice(c){
+ if(!c.v)return;const v=c.v,n=ac.currentTime;
+ v.out.gain.cancelScheduledValues(n);v.out.gain.setTargetAtTime(0,n,.7);
+ v.oscs.forEach(o=>o.detune.setTargetAtTime(-100,n,.8));
+ setTimeout(()=>v.all.forEach(o=>{try{o.stop()}catch(e){}}),3500);
+ c.v=null;
+}
+function chime(c,t0){
+ const T=TYPES[c.type];let lo=T.lo+12,hi=T.hi+12;
+ if(c.type==='cirrus'){lo=84;hi=100}if(c.type==='cumulonimbus'){lo=48;hi=62}
+ const p=pool(lo,hi);let i=Math.floor(c.y*(p.length-1)+Math.random()*3-1);i=Math.max(0,Math.min(p.length-1,i));
+ let m=p[i];if(Math.random()<tension*.6)m+=c.v.dis;
+ const f=fAt(m),vol=(c.type==='cumulonimbus'?.15:.1)*c.fade,len=c.type==='cumulonimbus'?3:1.8;
+ const p2=ac.createStereoPanner();p2.pan.value=Math.max(-1,Math.min(1,c.x*2-1));
+ p2.connect(master);const s=ac.createGain();s.gain.value=.8;p2.connect(s);s.connect(rev);
+ [[1,1],[2.76,.35],[5.4,.12]].forEach(([r,a])=>{
+  const o=ac.createOscillator();o.type='sine';o.frequency.value=f*r;
+  const g2=ac.createGain();g2.gain.setValueAtTime(0,t0);g2.gain.linearRampToValueAtTime(vol*a,t0+.008);
+  g2.gain.exponentialRampToValueAtTime(.0001,t0+len/Math.pow(r,.3));
+  o.connect(g2);g2.connect(p2);o.start(t0);o.stop(t0+len+.5);
+ });
+}
+function spawn(){
+ const types=['cirrus','cumulus','cumulus','stratus','cumulonimbus'];
+ const type=types[Math.floor(Math.random()*types.length)];
+ const fromL=Math.random()<.6,sz={cirrus:.07,cumulus:.09,stratus:.12,cumulonimbus:.13}[type];
+ const c={id:nextId++,type,x:fromL?-.12:1.12,y:type==='stratus'?.18+Math.random()*.2:type==='cirrus'?.7+Math.random()*.25:.3+Math.random()*.5,
+  r:sz*(.8+Math.random()*.5),vx:(fromL?1:-1)*(.004+Math.random()*.006),born:performance.now(),life:25000+Math.random()*30000,fade:0,dying:false,seed:Math.random()*99};
+ if(type==='cumulonimbus')c.grow=.00006;
+ clouds.push(c);if(ac)mkVoice(c);
+}
+function ensure(){
+ const n=+$('count').value;
+ while(clouds.filter(c=>!c.dying).length<n)spawn();
+ const live=clouds.filter(c=>!c.dying);
+ if(live.length>n){live.sort((a,b)=>a.r-b.r)[0].dying=true}
+}
+function step(dt){
+ const now=performance.now();
+ for(const c of clouds){
+  c.x+=c.vx*dt;c.y+=Math.sin(now/9000+c.seed)*.0002;
+  if(c.grow)c.r=Math.min(.2,c.r+c.grow*dt*1000/60);
+  if(!c.dying&&(now-c.born>c.life||c.x<-.2||c.x>1.2))c.dying=true;
+  const target=c.dying?0:1;
+  c.fade+=(target-c.fade)*Math.min(1,dt*(c.dying?.8:2.5));
+ }
+ for(const c of clouds)if(c.dying&&c.v&&c.fade<.5){
+  // merge: smaller voice glides toward a nearby larger cloud
+  killVoice(c);
+ }
+ clouds=clouds.filter(c=>!(c.dying&&c.fade<.02));
+ // voice cap: keep the 8 largest
+ const withV=clouds.filter(c=>c.v).sort((a,b)=>b.r-a.r);
+ withV.slice(8).forEach(killVoice);
+}
+function audioTick(){
+ if(!ac)return;const n=ac.currentTime;
+ for(const c of clouds){
+  if(!c.v){if(!c.dying&&c.fade>.05)mkVoice(c);continue}
+  const v=c.v,t=TYPES[c.type],m=noteFor(c),tens=Math.max(0,(tension-.4)/.6),f=fAt(m+v.dis*tens);
+  v.oscs.forEach(o=>o.frequency.setTargetAtTime(f,n,.8));v.up.frequency.setTargetAtTime(f*2,n,.8);
+  const sp=tension*30;
+  v.oscs[0].detune.setTargetAtTime(-8-sp*v.dir,n,1);v.oscs[2].detune.setTargetAtTime(8+sp*v.dir,n,1);
+  v.lfo.frequency.setTargetAtTime(.2+tension*2.5,n,1);
+  v.pan.pan.setTargetAtTime(Math.max(-1,Math.min(1,c.x*2-1)),n,.2);
+  const area=c.type==='cumulonimbus'?.6+c.r*4:.8+c.r*2;
+  v.out.gain.setTargetAtTime(t.gain*area*c.fade,n,.6);
+  if(n>v.next&&c.type!=='stratus'&&!c.dying){
+   chime(c,n+.02);
+   v.next=n+(c.type==='cirrus'?1.2+Math.random()*2.5:c.type==='cumulus'?2+Math.random()*4:5+Math.random()*5);
+  }
+ }
+}
+// drawing
+const STARS=Array.from({length:46},()=>({x:Math.random(),y:Math.random()*.6,r:.6+Math.random()*1.4,p:Math.random()*9}));
+function lerp(a,b,t){return a.map((v,i)=>Math.round(v+(b[i]-v)*t))}
+function sky(){
+ const t=tension,now=performance.now()/1000;
+ const top=lerp([140,132,228],[44,36,96],t),mid=lerp([236,178,222],[98,64,126],t),bot=lerp([255,216,190],[160,100,134],t);
+ const g1=g.createLinearGradient(0,0,0,H);
+ g1.addColorStop(0,`rgb(${top})`);g1.addColorStop(.55,`rgb(${mid})`);g1.addColorStop(1,`rgb(${bot})`);
+ g.fillStyle=g1;g.fillRect(0,0,W,H);
+ const glow=g.createRadialGradient(W*.5,H*1.05,0,W*.5,H*1.05,H*.8);
+ glow.addColorStop(0,`rgba(255,226,190,${.55*(1-t*.6)})`);glow.addColorStop(1,'rgba(255,226,190,0)');
+ g.fillStyle=glow;g.fillRect(0,0,W,H);
+ for(const s of STARS){g.fillStyle=`rgba(255,255,255,${(.25+.35*Math.sin(now*.8+s.p))*(1-t*.3)})`;g.beginPath();g.arc(s.x*W,s.y*H,s.r,0,7);g.fill()}
+}
+function puffs(c){
+ const t=TYPES[c.type],px=c.x*W,py=(1-c.y)*H,r=c.r*W,a=c.fade;
+ g.save();g.globalAlpha=Math.max(0,Math.min(1,a));
+ const n=c.type==='cirrus'?6:c.type==='stratus'?7:5;
+ const sx=c.type==='cirrus'?2.8:c.type==='stratus'?3:1,sy=c.type==='cirrus'?.25:c.type==='stratus'?.35:1;
+ for(let i=0;i<n;i++){
+  const k=Math.sin(c.seed*(i+1)*7.3),q=Math.cos(c.seed*(i+2)*3.1);
+  const ox=(i/(n-1)-.5)*r*(c.type==='cumulus'||c.type==='cumulonimbus'?1.6:3)+k*r*.15;
+  const oy=(c.type==='cumulonimbus'?-(i%3)*r*.35:q*r*.2);
+  const rr=r*(.55+.45*Math.abs(k))*(c.type==='cumulonimbus'?1.15:1);
+  const gr=g.createRadialGradient(px+ox,py+oy,0,px+ox,py+oy,rr*Math.max(sx,1));
+  gr.addColorStop(0,t.col);gr.addColorStop(1,t.col+'00');
+  g.fillStyle=gr;g.save();g.translate(px+ox,py+oy);g.scale(sx,sy);g.translate(-(px+ox),-(py+oy));
+  g.beginPath();g.arc(px+ox,py+oy,rr,0,7);g.fill();g.restore();
+ }
+ // voice ring
+ if(c.v){const pulse=(performance.now()/700+c.id)%1;g.strokeStyle='rgba(255,255,255,'+(.4*(1-pulse)*a)+')';
+  g.lineWidth=2;g.beginPath();g.ellipse(px,py,r*(1+pulse)*(c.type==='cirrus'||c.type==='stratus'?2.2:1.2),r*(1+pulse)*(c.type==='cirrus'?.4:c.type==='stratus'?.5:1.2),0,0,7);g.stroke()}
+ g.fillStyle='rgba(255,255,255,.95)';g.font='italic 400 19px Fraunces,Georgia,serif';g.textAlign='center';
+ g.shadowColor='rgba(80,50,140,.7)';g.shadowBlur=8;g.fillText(c.type+', '+(c.v?noteName(c.v.m):'...'),px,py+r*1.5+16);
+ g.restore();
+}
+function noteName(m){return ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][m%12]+Math.floor(m/12-1)}
+let last=performance.now();
+function frame(now){
+ const dt=Math.min(.1,(now-last)/1000);last=now;
+ ensure();step(dt);sky();
+ clouds.slice().sort((a,b)=>b.y-a.y).forEach(puffs);
+ requestAnimationFrame(frame);
+}
+// controls
+function setTension(v){tension=v;$('tension').value=v;$('tv').textContent=v.toFixed(2)}
+$('tension').oninput=e=>setTension(+e.target.value);
+$('count').oninput=e=>$('nv').textContent=e.target.value;
+$('storm').onclick=()=>setTension(.9);
+$('calm').onclick=()=>setTension(0);
+$('mute').onclick=e=>{muted=!muted;if(master)master.gain.setTargetAtTime(muted?0:.8,ac.currentTime,.1);e.target.textContent=muted?'Unmute':'Mute'};
+cv.addEventListener('pointerdown',e=>{
+ const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=1-(e.clientY-r.top)/r.height;
+ clouds.forEach(c=>{if(Math.hypot((c.x-x)*W,(c.y-y)*H)<c.r*W*1.3)c.dying=true});
+});
+$('go').onclick=()=>{
+ ac=new (window.AudioContext||window.webkitAudioContext)();
+ const comp=ac.createDynamicsCompressor();master=ac.createGain();master.gain.value=.8;master.connect(comp);comp.connect(ac.destination);
+ noiseBuf=ac.createBuffer(1,ac.sampleRate*2,ac.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+ rev=mkReverb();rev.connect(master);clouds.forEach(mkVoice);$('go').style.display='none';setInterval(audioTick,100);
+};
+for(let i=0;i<5;i++){spawn();const c=clouds[clouds.length-1];c.x=.1+Math.random()*.8;c.fade=1}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
