@@ -9,13 +9,16 @@ import argparse
 from pathlib import Path
 
 import joblib
+import pandas as pd
 
 from features import FEATURE_COLUMNS, build_feature_row
+
+DEFAULT_MODEL_PATH = Path(__file__).resolve().parent / "model" / "tension_classifier.joblib"
 
 _model = None
 
 
-def _load_model(model_path: str = "model/tension_classifier.joblib"):
+def _load_model(model_path):
     global _model
     if _model is None:
         path = Path(model_path)
@@ -25,13 +28,13 @@ def _load_model(model_path: str = "model/tension_classifier.joblib"):
     return _model
 
 
-def predict_tension(camera_summary: dict, weather: dict, model_path: str = "model/tension_classifier.joblib") -> float:
+def predict_tension(camera_summary: dict, weather: dict, model_path=DEFAULT_MODEL_PATH) -> float:
     """camera_summary: {"cirrus": frac, "cumulus": frac, "stratus": frac, "cumulonimbus": frac} (0-1 each).
     weather: {"pressure_msl": float, "pressure_3h_ago": float, "relative_humidity_2m": float}.
     Returns a 0-1 tension value."""
     model = _load_model(model_path)
     row = build_feature_row(camera_summary, weather)
-    X = [[row[c] for c in FEATURE_COLUMNS]]
+    X = pd.DataFrame([row], columns=FEATURE_COLUMNS)
     return float(model.predict_proba(X)[0, 1])
 
 
@@ -44,7 +47,7 @@ def main() -> None:
     parser.add_argument("--pressure-msl", type=float, required=True)
     parser.add_argument("--pressure-3h-ago", type=float, required=True)
     parser.add_argument("--humidity", type=float, required=True)
-    parser.add_argument("--model-path", default="model/tension_classifier.joblib")
+    parser.add_argument("--model-path", default=DEFAULT_MODEL_PATH)
     args = parser.parse_args()
 
     camera_summary = {
