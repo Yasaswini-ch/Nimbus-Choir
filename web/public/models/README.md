@@ -1,0 +1,1 @@
+`cloud-classifier.onnx` and `classes.json` land here, produced by `/training/export.py`. Until then, `src/sky/classifier.js` fails to load the model gracefully (logs a warning, falls back to leaving `.type` unset for clear-sky clouds; patch-mode pseudo-clouds are unaffected since they don't use the model).

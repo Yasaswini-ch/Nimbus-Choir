@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nimbus Choir</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&family=Quicksand:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+<main>
+  <h1>Nimbus Choir</h1>
+  <p class="sub">Point the camera at the sky. Every detected cloud gets tracked and classified, offline, on this device.</p>
+
+  <div class="stage">
+    <video id="video" playsinline muted></video>
+    <canvas id="overlay"></canvas>
+    <button id="go">Tap to wake the sky</button>
+  </div>
+
+  <div class="panel">
+    <label>Sky-mask sensitivity: <b id="sensitivity-value">0.50</b>
+      <input id="sensitivity" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+    <label>Horizon override: <b id="horizon-value">auto</b>
+      <input id="horizon" type="range" min="0" max="1" step="0.01" value="0"></label>
+  </div>
+
+  <div class="row">
+    <button class="b" id="toggle-debug">Debug overlay: on</button>
+    <button class="b" id="toggle-horizon">Horizon: auto</button>
+    <label class="b file-label">Load test video<input id="video-file" type="file" accept="video/*" hidden></label>
+  </div>
+
+  <div class="legend" id="status"></div>
+</main>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
