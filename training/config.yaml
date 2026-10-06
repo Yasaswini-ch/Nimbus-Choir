@@ -1,0 +1,30 @@
+# Every tunable number for the teacher fine-tune and distillation lives here.
+teacher:
+  base_model: "Qwen/Qwen3.6-35B-A3B-Instruct"
+  lora_rank: 16
+  learning_rate: 1.0e-4
+  epochs: 3
+  batch_size: 16
+  prompt: >-
+    What cloud type is shown in this image? Answer with exactly one word:
+    cirrus, cumulus, stratus, cumulonimbus, or clear.
+  eval_every_n_steps: 50
+
+distill:
+  temperature: 2.0          # softmax temperature when reading back teacher probs
+  samples_per_image: 1       # repeat sampling for noisier soft labels, if >1
+
+student:
+  backbone: "dinov2_vits14"  # or dinov2_vitb14 for more accuracy, more size
+  head_hidden_dim: 128
+  learning_rate: 1.0e-3
+  epochs: 15
+  batch_size: 32
+  distill_loss_weight: 0.5   # blend: 0 = ground truth only, 1 = teacher only
+
+pricing_estimate:
+  # From https://tinker-docs.thinkingmachines.ai/tinker/models/ at plan time;
+  # re-check before a real run since Tinker's rates change.
+  train_usd_per_million_tokens: 1.177
+  sample_usd_per_million_tokens: 1.335
+  prefill_usd_per_million_tokens: 0.54
