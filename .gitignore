@@ -14,6 +14,15 @@ dist/
 *.onnx
 *.safetensors
 *.ckpt
+*.joblib
+
+# Generated data / model outputs (reproducible via their scripts)
+/data/raw/
+/data/prepped/
+/data/teacher/
+/data/student/
+/forecast/data/
+/forecast/model/
 
 # Env / secrets
 .env
