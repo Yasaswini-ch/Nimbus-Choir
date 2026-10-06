@@ -45,6 +45,7 @@ export class CloudTracker {
   update(detections, now = performance.now()) {
     const dt = this.lastUpdate == null ? 0 : Math.max(0, (now - this.lastUpdate) / 1000);
     this.lastUpdate = now;
+    const events = [];
 
     const activeTracks = [...this.tracks.values()];
     const pairs = [];
@@ -84,6 +85,7 @@ export class CloudTracker {
       if (matchedTracks.has(track.id)) continue;
       const winner = matches.find((m) => dist(m.track.centroid, track.centroid) < MERGE_DISTANCE);
       if (winner) {
+        events.push({ type: "merge", id: track.id, intoId: winner.track.id });
         this.tracks.delete(track.id); // merged into winner.track this frame
         continue;
       }
@@ -91,6 +93,7 @@ export class CloudTracker {
       track.lost = true;
       track.age += dt;
       if (now - track.lostSince > GRACE_PERIOD_MS) {
+        events.push({ type: "expired", id: track.id });
         this.tracks.delete(track.id);
       }
     }
@@ -115,6 +118,6 @@ export class CloudTracker {
       });
     }
 
-    return [...this.tracks.values()];
+    return { tracks: [...this.tracks.values()], events };
   }
 }
