@@ -308,6 +308,7 @@ const globePicker = createGlobePicker({
     globePicker.close();
     globePickerEl.hidden = true;
     await startEarthMode(region.id);
+    await beginSession(); // picking a region before ever tapping Go must still start the engine
   },
 });
 
@@ -344,6 +345,27 @@ bindControls({
   },
 });
 
+/** The "tap to wake the sky" gesture: starts the audio engine (needs a user
+ * gesture), the tension poll loop, and the narrator. Idempotent, so it's
+ * safe to call again from the globe picker's onPick -- picking a region
+ * before ever tapping Go must also consume this gesture, or the Go overlay
+ * just reappears once the globe-picker modal closes (it was always still
+ * there underneath, never dismissed). Camera startup is handled separately
+ * by the caller since Earth mode skips it entirely. */
+async function beginSession() {
+  if (started) return;
+  started = true;
+  resizeOverlay();
+  engine.start();
+  wakeLock.request();
+  goButton.style.display = "none";
+
+  updateTension();
+  setInterval(updateTension, PREDICT_INTERVAL_MS);
+
+  narrator.start(); // caption always shown regardless of the voice toggle
+}
+
 goButton.onclick = async () => {
   if (started) {
     // this was the "tap to resume" state
@@ -351,10 +373,7 @@ goButton.onclick = async () => {
     goButton.style.display = "none";
     return;
   }
-  started = true;
-  resizeOverlay();
-  engine.start();
-  wakeLock.request();
+  await beginSession();
   if (!state.earthMode) {
     try {
       await camera.startCamera();
@@ -363,10 +382,4 @@ goButton.onclick = async () => {
     }
     camera.run(onFrame);
   }
-  goButton.style.display = "none";
-
-  updateTension();
-  setInterval(updateTension, PREDICT_INTERVAL_MS);
-
-  narrator.start(); // caption always shown regardless of the voice toggle
 };
