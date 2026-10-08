@@ -66,10 +66,32 @@
     <section class="col-main" id="stage" aria-label="Live sky view">
       <div class="stage">
         <video id="video" playsinline muted></video>
+        <canvas id="earth-view" hidden></canvas>
         <canvas id="overlay"></canvas>
+        <button class="earth-badge" id="earth-badge" hidden title="Back to the sky camera">
+          <span class="earth-badge-dot" aria-hidden="true"></span>
+          Online &mdash; Earth mode
+        </button>
+
+        <div class="globe-picker" id="globe-picker" hidden>
+          <canvas id="globe-canvas"></canvas>
+          <div class="globe-clouds" id="globe-clouds" aria-hidden="true">
+            <span class="cloud-blob c1"></span>
+            <span class="cloud-blob c2"></span>
+            <span class="cloud-blob c3"></span>
+            <span class="cloud-blob c4"></span>
+            <span class="cloud-blob c5"></span>
+            <span class="cloud-blob c6"></span>
+          </div>
+          <p class="globe-hint" id="globe-hint">Tap a glowing point to listen there</p>
+          <button class="b globe-cancel" id="globe-cancel">Cancel</button>
+        </div>
+
         <button id="go">Tap to wake the sky</button>
+        <button class="earth-trigger" id="open-globe" aria-label="Open Earth mode" title="Earth mode">&#127758;</button>
       </div>
       <p class="sub caption" id="narrator-caption"></p>
+      <p class="sub caption" id="earth-message"></p>
     </section>
 
     <aside class="col-side">

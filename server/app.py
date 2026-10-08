@@ -148,7 +148,14 @@ def narrate_speech_endpoint(req: NarrateSpeechRequest) -> Response:
 def earth_regions() -> dict:
     return {
         "regions": [
-            {"id": rid, "label": r["label"], "satellite": r["satellite"], "satellite_label": gibs.SATELLITES[r["satellite"]]["label"]}
+            {
+                "id": rid,
+                "label": r["label"],
+                "lat": r["lat"],
+                "lon": r["lon"],
+                "satellite": r["satellite"],
+                "satellite_label": gibs.SATELLITES[r["satellite"]]["label"],
+            }
             for rid, r in gibs.REGIONS.items()
         ]
     }

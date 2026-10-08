@@ -9,8 +9,20 @@ import * as engine from "./audio/engine.js";
 import { createWakeLockManager } from "./audio/wakeLock.js";
 import { estimateTensionFallback } from "./forecast/fallback.js";
 import { createNarrator } from "./narrator/narrator.js";
+import { segmentSatelliteClouds } from "./earth/satelliteSegment.js";
+import { SatelliteSource, fetchRegions } from "./earth/satelliteSource.js";
+import { createGlobePicker } from "./earth/globePicker.js";
+import { toGray, mean } from "./sky/imageUtils.js";
 
 const video = document.getElementById("video");
+const earthViewCanvas = document.getElementById("earth-view");
+const earthViewCtx = earthViewCanvas.getContext("2d");
+const earthBadge = document.getElementById("earth-badge");
+const earthMessageEl = document.getElementById("earth-message");
+const openGlobeButton = document.getElementById("open-globe");
+const globePickerEl = document.getElementById("globe-picker");
+const globeCancelButton = document.getElementById("globe-cancel");
+const globeHintEl = document.getElementById("globe-hint");
 const overlayCanvas = document.getElementById("overlay");
 const overlayCtx = overlayCanvas.getContext("2d");
 const statusEl = document.getElementById("status");
@@ -18,6 +30,7 @@ const goButton = document.getElementById("go");
 const narratorCaptionEl = document.getElementById("narrator-caption");
 
 const camera = new CameraSource(video);
+const satellite = new SatelliteSource();
 const tracker = new CloudTracker();
 const wakeLock = createWakeLockManager({
   onNeedsResume: () => {
@@ -31,6 +44,7 @@ const state = {
   horizonOverride: null,
   debug: true,
   narratorVoiceOn: false,
+  earthMode: false,
 };
 
 let knownIds = new Set();
@@ -38,6 +52,7 @@ let started = false;
 let latestLiveTracks = [];
 let cachedCoords = null;
 let lastPressureTrend = null;
+let lastUpwindCloudCover = null;
 
 const narrator = createNarrator({
   intervalMs: 60000,
@@ -88,10 +103,12 @@ async function updateTension() {
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), PREDICT_TIMEOUT_MS);
+      const body = { camera, lat: coords.lat, lon: coords.lon };
+      if (state.earthMode && lastUpwindCloudCover != null) body.upwind_cloud_cover = lastUpwindCloudCover;
       const res = await fetch(PREDICT_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ camera, lat: coords.lat, lon: coords.lon }),
+        body: JSON.stringify(body),
         signal: controller.signal,
       });
       clearTimeout(timer);
@@ -173,12 +190,152 @@ async function onFrame(imageData, sourceCanvas) {
   updateStatus(mode, tracks);
 }
 
+/** Clears every currently-tracked cloud/patch/satellite blob from both the
+ * tracker and the sound engine, used when switching between camera and
+ * Earth mode so ids from one source never linger as silent engine voices. */
+function clearActiveTracks() {
+  for (const id of tracker.tracks.keys()) engine.removeCloud(id);
+  tracker.tracks.clear();
+  knownIds = new Set();
+  latestLiveTracks = [];
+}
+
+async function onSatelliteFrame(visibleImageData, irImageData, sourceCanvas) {
+  const { blobs } = segmentSatelliteClouds(visibleImageData, irImageData);
+  const { tracks, events } = tracker.update(blobs, performance.now());
+
+  const stillHere = new Set(tracks.map((t) => t.id));
+  for (const id of knownIds) if (!stillHere.has(id)) dropHistory(id);
+  knownIds = stillHere;
+
+  const liveTracks = tracks.filter((t) => !t.lost);
+  await Promise.all(liveTracks.map((t) => maybeClassify(t, sourceCanvas)));
+  latestLiveTracks = liveTracks;
+
+  for (const event of events) {
+    engine.removeCloud(event.id, { mergeIntoId: event.type === "merge" ? event.intoId : null });
+  }
+  for (const track of liveTracks) {
+    engine.upsertCloud({
+      id: track.id,
+      type: track.type,
+      mode: track.mode,
+      area: track.area,
+      centroid: track.centroid,
+      height: track.height,
+      brightness: track.brightness,
+      texture: track.texture,
+      fade: 1,
+    });
+  }
+
+  const { gray } = toGray(visibleImageData);
+  lastUpwindCloudCover = mean(Array.from(gray)) / 255;
+
+  earthViewCtx.clearRect(0, 0, earthViewCanvas.width, earthViewCanvas.height);
+  earthViewCtx.drawImage(sourceCanvas, 0, 0, earthViewCanvas.width, earthViewCanvas.height);
+
+  drawOverlay(overlayCtx, {
+    width: overlayCanvas.width,
+    height: overlayCanvas.height,
+    horizonRow: null,
+    horizonHeight: 0,
+    tracks,
+    enabled: state.debug,
+  });
+
+  updateStatus("satellite", tracks);
+}
+
+async function startEarthMode(regionId) {
+  camera.stop();
+  clearActiveTracks();
+  earthMessageEl.textContent = "Loading satellite imagery…";
+  try {
+    await satellite.load(regionId);
+  } catch (err) {
+    earthMessageEl.textContent = "Earth mode needs internet and couldn't reach the satellite proxy — back to the sky camera.";
+    console.warn("[earth mode]", err.message);
+    await exitEarthMode();
+    return;
+  }
+
+  state.earthMode = true;
+  earthMessageEl.textContent = `${satellite.satelliteLabel} — 10-minute geostationary frames, looping.`;
+  const cols = satellite.tiles ? Math.max(...satellite.tiles.map((t) => t.col)) + 1 : 1;
+  const rows = satellite.tiles ? Math.max(...satellite.tiles.map((t) => t.row)) + 1 : 1;
+  // internal resolution doesn't matter much (CSS scales it); this just keeps the aspect ratio sane
+  earthViewCanvas.width = cols * 256;
+  earthViewCanvas.height = rows * 256;
+
+  video.hidden = true;
+  earthViewCanvas.hidden = false;
+  earthBadge.hidden = false;
+  openGlobeButton.hidden = true;
+  satellite.run(onSatelliteFrame);
+}
+
+/** Back to the sky camera: stops the satellite loop, clears tracked blobs,
+ * restarts the live camera feed if the app has already been woken up. */
+async function exitEarthMode() {
+  state.earthMode = false;
+  satellite.stop();
+  clearActiveTracks();
+  video.hidden = false;
+  earthViewCanvas.hidden = true;
+  earthBadge.hidden = true;
+  openGlobeButton.hidden = false;
+  earthMessageEl.textContent = "";
+
+  if (started) {
+    if (!video.srcObject) {
+      try {
+        await camera.startCamera();
+      } catch (err) {
+        console.warn("[camera] getUserMedia failed, use 'Load test video' instead:", err);
+      }
+    }
+    camera.run(onFrame);
+  }
+}
+
+const globePicker = createGlobePicker({
+  canvas: document.getElementById("globe-canvas"),
+  cloudsEl: document.getElementById("globe-clouds"),
+  hintEl: globeHintEl,
+  onPick: async (region) => {
+    globePicker.close();
+    globePickerEl.hidden = true;
+    await startEarthMode(region.id);
+  },
+});
+
+openGlobeButton.onclick = () => {
+  globePickerEl.hidden = false;
+  globeHintEl.textContent = "Tap a glowing point to listen there";
+  globePicker.open();
+};
+
+globeCancelButton.onclick = () => {
+  globePicker.close();
+  globePickerEl.hidden = true;
+};
+
+earthBadge.onclick = () => {
+  exitEarthMode();
+};
+
+fetchRegions()
+  .then((regions) => globePicker.setRegions(regions))
+  .catch((err) => console.warn("[earth mode] couldn't load region list:", err));
+
 bindControls({
   onSensitivityChange: (v) => (state.sensitivity = v),
   onHorizonChange: (v) => (state.horizonOverride = v),
   onDebugToggle: (on) => (state.debug = on),
   onNarratorToggle: (on) => (state.narratorVoiceOn = on),
   onVideoFile: async (file) => {
+    if (state.earthMode) return; // Earth mode owns the stage while it's on
     camera.stop();
     await camera.startFile(file);
     resizeOverlay();
@@ -197,13 +354,15 @@ goButton.onclick = async () => {
   resizeOverlay();
   engine.start();
   wakeLock.request();
-  try {
-    await camera.startCamera();
-  } catch (err) {
-    console.warn("[camera] getUserMedia failed, use 'Load test video' instead:", err);
+  if (!state.earthMode) {
+    try {
+      await camera.startCamera();
+    } catch (err) {
+      console.warn("[camera] getUserMedia failed, use 'Load test video' instead:", err);
+    }
+    camera.run(onFrame);
   }
   goButton.style.display = "none";
-  camera.run(onFrame);
 
   updateTension();
   setInterval(updateTension, PREDICT_INTERVAL_MS);

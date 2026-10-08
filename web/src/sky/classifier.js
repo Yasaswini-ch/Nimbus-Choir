@@ -89,7 +89,9 @@ function applyVote(track, h) {
 
 /** Mutates and returns `track` with `.type` (and `.confidence` for real clouds) set. */
 export async function maybeClassify(track, sourceCanvas, now = performance.now()) {
-  if (track.mode === "patch") {
+  if (track.mode === "patch" || track.mode === "satellite") {
+    // Satellite views never run the ground-photo classifier (it was never trained
+    // on satellite imagery); type comes from satelliteSegment.js's brightness/size bucket.
     track.type = track.pseudoType;
     track.confidence = 1;
     return track;

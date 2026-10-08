@@ -1,0 +1,169 @@
+import coastlines from "./coastlines.json";
+import { project, unproject, nearestRegion } from "./globe.js";
+
+const ROTATION_SPEED_DEG_PER_SEC = 6;
+const PIN_HIT_RADIUS_PX = 16;
+
+/**
+ * The "click the Earth icon -> clouds part -> spinning globe -> pick a
+ * region" picker. Owns a canvas, an auto-rotation loop, and click-to-pick
+ * (snaps to the nearest of the 5 real GIBS-covered regions, per
+ * globe.js's nearestRegion). The cloud-parting reveal itself is a CSS
+ * transition on `cloudsEl` (toggled by a class here); this module only
+ * draws the globe and resolves clicks.
+ */
+export function createGlobePicker({ canvas, cloudsEl, hintEl, onPick }) {
+  const ctx = canvas.getContext("2d");
+  let regions = [];
+  let rotationLambda = -20;
+  let lastFrameAt = null;
+  let rafId = null;
+  let size = 0;
+  let hoveredRegion = null;
+
+  function setRegions(list) {
+    regions = list;
+  }
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    size = Math.min(rect.width, rect.height);
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = size * dpr;
+    canvas.height = size * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function toScreen(x, y) {
+    const r = size / 2;
+    return { sx: r + x * r * 0.96, sy: r + y * r * 0.96 };
+  }
+
+  function draw() {
+    const r = size / 2;
+    ctx.clearRect(0, 0, size, size);
+
+    const gradient = ctx.createRadialGradient(r * 0.65, r * 0.6, r * 0.1, r, r, r);
+    gradient.addColorStop(0, "#5a4a9e");
+    gradient.addColorStop(1, "#1c1438");
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(r, r, r * 0.96, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(r, r, r * 0.96, 0, Math.PI * 2);
+    ctx.clip();
+
+    ctx.strokeStyle = "rgba(255,255,255,0.75)";
+    ctx.lineWidth = 1;
+    for (const line of coastlines) {
+      ctx.beginPath();
+      let drawing = false;
+      for (const [lon, lat] of line) {
+        const { x, y, visible } = project(lon, lat, rotationLambda);
+        if (!visible) { drawing = false; continue; }
+        const { sx, sy } = toScreen(x, y);
+        if (!drawing) { ctx.moveTo(sx, sy); drawing = true; } else { ctx.lineTo(sx, sy); }
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    for (const region of regions) {
+      const { x, y, visible } = project(region.lon, region.lat, rotationLambda);
+      if (!visible) continue;
+      const { sx, sy } = toScreen(x, y);
+      const isHover = hoveredRegion?.id === region.id;
+
+      ctx.beginPath();
+      ctx.fillStyle = isHover ? "#ffd27a" : "#ffb545";
+      ctx.shadowColor = isHover ? "#ffd27a" : "#ffb545";
+      ctx.shadowBlur = isHover ? 14 : 8;
+      ctx.arc(sx, sy, isHover ? 6 : 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      if (isHover) {
+        ctx.font = "600 13px Quicksand, sans-serif";
+        ctx.fillStyle = "#fff";
+        ctx.fillText(region.label, sx + 10, sy - 8);
+      }
+    }
+  }
+
+  function tick(now) {
+    if (lastFrameAt != null) {
+      const dt = (now - lastFrameAt) / 1000;
+      rotationLambda = (rotationLambda + ROTATION_SPEED_DEG_PER_SEC * dt) % 360;
+    }
+    lastFrameAt = now;
+    draw();
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function pointerToLonLat(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const r = rect.width / 2;
+    const x = (clientX - rect.left - r) / (r * 0.96);
+    const y = (clientY - rect.top - r) / (r * 0.96);
+    return unproject(x, y, rotationLambda);
+  }
+
+  function regionAtPointer(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    for (const region of regions) {
+      const { x, y, visible } = project(region.lon, region.lat, rotationLambda);
+      if (!visible) continue;
+      const { sx, sy } = toScreen(x, y);
+      const screenX = rect.left + sx, screenY = rect.top + sy;
+      if (Math.hypot(clientX - screenX, clientY - screenY) <= PIN_HIT_RADIUS_PX) return region;
+    }
+    return null;
+  }
+
+  function onPointerMove(e) {
+    hoveredRegion = regionAtPointer(e.clientX, e.clientY);
+    canvas.style.cursor = hoveredRegion ? "pointer" : "grab";
+  }
+
+  function onClick(e) {
+    const hit = regionAtPointer(e.clientX, e.clientY);
+    if (hit) {
+      onPick(hit);
+      return;
+    }
+    const lonLat = pointerToLonLat(e.clientX, e.clientY);
+    if (!lonLat || !regions.length) return;
+    const nearest = nearestRegion(lonLat.lon, lonLat.lat, regions);
+    if (hintEl) hintEl.textContent = `No live coverage exactly there — nearest is ${nearest.label}.`;
+    onPick(nearest);
+  }
+
+  canvas.addEventListener("pointermove", onPointerMove);
+  canvas.addEventListener("click", onClick);
+
+  function open() {
+    resize();
+    lastFrameAt = null;
+    if (cloudsEl) cloudsEl.classList.remove("revealed");
+    // let the "clouds in place" frame paint before parting them, so the transition is visible
+    requestAnimationFrame(() => {
+      if (cloudsEl) cloudsEl.classList.add("revealed");
+    });
+    if (!rafId) rafId = requestAnimationFrame(tick);
+  }
+
+  function close() {
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = null;
+    if (cloudsEl) cloudsEl.classList.remove("revealed");
+  }
+
+  window.addEventListener("resize", () => {
+    if (rafId) resize();
+  });
+
+  return { setRegions, open, close };
+}

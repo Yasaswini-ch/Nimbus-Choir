@@ -1,4 +1,5 @@
-/** Wires the sensitivity/horizon sliders, debug/narrator toggles, and test-video file picker. */
+/** Wires the sensitivity/horizon sliders, debug/narrator toggles, and test-video file picker.
+ * Earth mode's globe picker is complex enough to own its own wiring directly in main.js. */
 
 export function bindControls({ onSensitivityChange, onHorizonChange, onDebugToggle, onNarratorToggle, onVideoFile }) {
   const sensitivity = document.getElementById("sensitivity");

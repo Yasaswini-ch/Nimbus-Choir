@@ -7,6 +7,7 @@ export default defineConfig({
       "/predict": "http://localhost:8000",
       "/sensor": "http://localhost:8000",
       "/narrate": "http://localhost:8000",
+      "/earth": "http://localhost:8000",
     },
   },
   build: {
