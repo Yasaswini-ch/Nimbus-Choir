@@ -8,12 +8,14 @@ import { bindControls } from "./ui/controls.js";
 import * as engine from "./audio/engine.js";
 import { createWakeLockManager } from "./audio/wakeLock.js";
 import { estimateTensionFallback } from "./forecast/fallback.js";
+import { createNarrator } from "./narrator/narrator.js";
 
 const video = document.getElementById("video");
 const overlayCanvas = document.getElementById("overlay");
 const overlayCtx = overlayCanvas.getContext("2d");
 const statusEl = document.getElementById("status");
 const goButton = document.getElementById("go");
+const narratorCaptionEl = document.getElementById("narrator-caption");
 
 const camera = new CameraSource(video);
 const tracker = new CloudTracker();
@@ -28,12 +30,25 @@ const state = {
   sensitivity: 0.5,
   horizonOverride: null,
   debug: true,
+  narratorVoiceOn: false,
 };
 
 let knownIds = new Set();
 let started = false;
 let latestLiveTracks = [];
 let cachedCoords = null;
+let lastPressureTrend = null;
+
+const narrator = createNarrator({
+  intervalMs: 60000,
+  captionEl: narratorCaptionEl,
+  isVoiceEnabled: () => state.narratorVoiceOn,
+  getState: () => ({
+    camera: cameraSummaryFromTracks(latestLiveTracks),
+    tension: engine.getTension(),
+    pressureTrend: lastPressureTrend,
+  }),
+});
 
 const PREDICT_URL = "/predict"; // co-hosted FastAPI server; adjust if deployed separately
 const PREDICT_INTERVAL_MS = 5 * 60 * 1000;
@@ -83,6 +98,7 @@ async function updateTension() {
       if (res.ok) {
         const data = await res.json();
         engine.setTension(data.tension);
+        lastPressureTrend = data.pressure_trend;
         return;
       }
     } catch {
@@ -161,6 +177,7 @@ bindControls({
   onSensitivityChange: (v) => (state.sensitivity = v),
   onHorizonChange: (v) => (state.horizonOverride = v),
   onDebugToggle: (on) => (state.debug = on),
+  onNarratorToggle: (on) => (state.narratorVoiceOn = on),
   onVideoFile: async (file) => {
     camera.stop();
     await camera.startFile(file);
@@ -190,4 +207,6 @@ goButton.onclick = async () => {
 
   updateTension();
   setInterval(updateTension, PREDICT_INTERVAL_MS);
+
+  narrator.start(); // caption always shown regardless of the voice toggle
 };

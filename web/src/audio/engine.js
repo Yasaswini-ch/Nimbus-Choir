@@ -18,6 +18,7 @@ const brightGapLimiter = createBrightGapLimiter();
 let tension = 0;
 let scaleName = "penta";
 let root = 0;
+let muted = false;
 
 function randomInterval([lo, hi]) {
   return lo + Math.random() * (hi - lo);
@@ -115,8 +116,22 @@ export function setRoot(midi) {
   root = midi;
 }
 
-export function setMuted(muted) {
+export function setMuted(isMuted) {
+  muted = isMuted;
   if (master && ctx) master.gain.setTargetAtTime(muted ? 0 : MASTER_GAIN, ctx.currentTime, 0.1);
+}
+
+/** Lowers the master gain to targetFraction of normal for durationMs, then restores it
+ * (respecting mute). For the sky narrator to duck the ambient mix while it speaks. */
+export function duckMasterGain(targetFraction, durationMs) {
+  if (!master || !ctx) return;
+  const now = ctx.currentTime;
+  master.gain.cancelScheduledValues(now);
+  master.gain.setTargetAtTime(muted ? 0 : MASTER_GAIN * targetFraction, now, 0.3);
+  setTimeout(() => {
+    if (!master || !ctx) return;
+    master.gain.setTargetAtTime(muted ? 0 : MASTER_GAIN, ctx.currentTime, 0.5);
+  }, durationMs);
 }
 
 /** Creates or updates the voice for this cloud/patch id. Call once per tracked cloud per frame. */
@@ -146,6 +161,10 @@ export function removeCloud(id, { mergeIntoId = null } = {}) {
   }
   registry.delete(id);
   reconcileVoices(ctx.currentTime);
+}
+
+export function getTension() {
+  return tension;
 }
 
 export function getActiveVoiceCount() {

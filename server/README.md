@@ -22,6 +22,23 @@ Takes one `/firmware` reading (`temp_c`, `humidity`, `pressure_hpa`,
 the same store `sensor_logger.py` (the serial-reading path) writes to, so
 it doesn't matter which transport actually got through.
 
+## /narrate and /narrate/speech
+`/narrate` sends the camera cloud-type summary and tension to a local Gemma
+model (via Ollama) and returns one or two playful caption lines
+(`narrator.py`). `/narrate/speech` turns that caption into audio using
+Piper (`tts.py`), an open-weight, fully offline TTS -- no API key, no
+network call, consistent with the project's "no data leaves the device"
+constraint. Returns 503 if no Piper voice model is installed; the web app
+falls back to the browser's own `speechSynthesis` when either endpoint is
+unreachable.
+
+Download a voice model once:
+```
+python -m piper.download_voices en_US-lessac-medium
+```
+It's saved under `server/models/` by default; point `PIPER_MODEL_PATH` at a
+different `.onnx` file to use another voice.
+
 ## Run
 ```
 pip install -r requirements.txt

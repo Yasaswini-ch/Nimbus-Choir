@@ -1,16 +1,18 @@
-/** Wires the sensitivity/horizon sliders, debug toggle, and test-video file picker. */
+/** Wires the sensitivity/horizon sliders, debug/narrator toggles, and test-video file picker. */
 
-export function bindControls({ onSensitivityChange, onHorizonChange, onDebugToggle, onVideoFile }) {
+export function bindControls({ onSensitivityChange, onHorizonChange, onDebugToggle, onNarratorToggle, onVideoFile }) {
   const sensitivity = document.getElementById("sensitivity");
   const sensitivityValue = document.getElementById("sensitivity-value");
   const horizon = document.getElementById("horizon");
   const horizonValue = document.getElementById("horizon-value");
   const horizonToggle = document.getElementById("toggle-horizon");
   const debugToggle = document.getElementById("toggle-debug");
+  const narratorToggle = document.getElementById("toggle-narrator");
   const videoFile = document.getElementById("video-file");
 
   let horizonManual = false;
   let debugOn = true;
+  let narratorVoiceOn = false;
 
   sensitivity.oninput = (e) => {
     const v = +e.target.value;
@@ -36,6 +38,12 @@ export function bindControls({ onSensitivityChange, onHorizonChange, onDebugTogg
     debugOn = !debugOn;
     debugToggle.textContent = `Debug overlay: ${debugOn ? "on" : "off"}`;
     onDebugToggle(debugOn);
+  };
+
+  narratorToggle.onclick = () => {
+    narratorVoiceOn = !narratorVoiceOn;
+    narratorToggle.textContent = `Sky narrator: ${narratorVoiceOn ? "on" : "off"}`;
+    onNarratorToggle(narratorVoiceOn);
   };
 
   videoFile.onchange = (e) => {

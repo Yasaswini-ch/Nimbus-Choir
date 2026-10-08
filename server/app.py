@@ -8,13 +8,15 @@ from pathlib import Path
 from typing import Optional
 
 import requests
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel, Field
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "forecast"))
 from predict import predict_tension  # noqa: E402
 
 from db import get_connection, insert_reading
+from narrator import narrate
+from tts import TTSNotConfigured, synthesize_speech
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 COARSE_ROUNDING = 0.5  # degrees -- never use/forward exact GPS
@@ -37,6 +39,7 @@ class PredictRequest(BaseModel):
 
 class PredictResponse(BaseModel):
     tension: float
+    pressure_trend: float
 
 
 def coarse_round(value: float) -> float:
@@ -79,7 +82,8 @@ def predict(req: PredictRequest) -> PredictResponse:
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    return PredictResponse(tension=tension)
+    pressure_trend = weather["pressure_msl"] - weather["pressure_3h_ago"]
+    return PredictResponse(tension=tension, pressure_trend=pressure_trend)
 
 
 class SensorReading(BaseModel):
@@ -104,6 +108,38 @@ def _db():
 def sensor(reading: SensorReading) -> dict:
     insert_reading(_db(), reading.model_dump())
     return {"status": "ok"}
+
+
+class NarrateRequest(BaseModel):
+    camera: CameraSummary
+    tension: float = Field(0.0, ge=0, le=1)
+    pressure_trend: Optional[float] = None
+
+
+class NarrateResponse(BaseModel):
+    caption: str
+
+
+@app.post("/narrate", response_model=NarrateResponse)
+def narrate_endpoint(req: NarrateRequest) -> NarrateResponse:
+    try:
+        caption = narrate(req.camera.model_dump(), req.tension, req.pressure_trend)
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"narrator model unreachable: {exc}") from exc
+    return NarrateResponse(caption=caption)
+
+
+class NarrateSpeechRequest(BaseModel):
+    text: str
+
+
+@app.post("/narrate/speech")
+def narrate_speech_endpoint(req: NarrateSpeechRequest) -> Response:
+    try:
+        audio = synthesize_speech(req.text)
+    except TTSNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return Response(content=audio, media_type="audio/wav")
 
 
 @app.get("/health")
