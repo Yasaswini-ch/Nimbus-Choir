@@ -28,6 +28,11 @@ export function createGlobePicker({ canvas, cloudsEl, hintEl, onPick }) {
   function resize() {
     const rect = canvas.getBoundingClientRect();
     size = Math.min(rect.width, rect.height);
+    if (size <= 0) {
+      // canvas isn't laid out yet (e.g. this very frame it just became visible) -- try again next frame
+      requestAnimationFrame(resize);
+      return;
+    }
     const dpr = window.devicePixelRatio || 1;
     canvas.width = size * dpr;
     canvas.height = size * dpr;
@@ -99,8 +104,13 @@ export function createGlobePicker({ canvas, cloudsEl, hintEl, onPick }) {
       rotationLambda = (rotationLambda + ROTATION_SPEED_DEG_PER_SEC * dt) % 360;
     }
     lastFrameAt = now;
-    draw();
+    // schedule the next frame FIRST: a draw() error must never silently kill the loop
     rafId = requestAnimationFrame(tick);
+    try {
+      draw();
+    } catch (err) {
+      console.error("[globe] draw() failed:", err);
+    }
   }
 
   function pointerToLonLat(clientX, clientY) {
@@ -145,13 +155,19 @@ export function createGlobePicker({ canvas, cloudsEl, hintEl, onPick }) {
   canvas.addEventListener("click", onClick);
 
   function open() {
-    resize();
+    if (cloudsEl) {
+      cloudsEl.classList.remove("revealed");
+      void cloudsEl.offsetWidth; // force layout so the browser commits the "closed" state before we transition
+      // a single rAF can land in the same unpainted frame as the mutation above and skip the
+      // transition entirely; nesting two guarantees at least one real paint happens in between
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (cloudsEl) cloudsEl.classList.add("revealed");
+        });
+      });
+    }
     lastFrameAt = null;
-    if (cloudsEl) cloudsEl.classList.remove("revealed");
-    // let the "clouds in place" frame paint before parting them, so the transition is visible
-    requestAnimationFrame(() => {
-      if (cloudsEl) cloudsEl.classList.add("revealed");
-    });
+    resize();
     if (!rafId) rafId = requestAnimationFrame(tick);
   }
 
