@@ -28,12 +28,20 @@ def _load_model(model_path):
     return _model
 
 
-def predict_tension(camera_summary: dict, weather: dict, model_path=DEFAULT_MODEL_PATH) -> float:
+def predict_tension(
+    camera_summary: dict, weather: dict, model_path=DEFAULT_MODEL_PATH, upwind_cloud_cover: float | None = None
+) -> float:
     """camera_summary: {"cirrus": frac, "cumulus": frac, "stratus": frac, "cumulonimbus": frac} (0-1 each).
     weather: {"pressure_msl": float, "pressure_3h_ago": float, "relative_humidity_2m": float}.
+    upwind_cloud_cover: optional 0-1 fraction from Earth mode's satellite view, for the feature
+    slot noted in the README -- accepted here but NOT in FEATURE_COLUMNS, so it's dropped by the
+    DataFrame selection below and has no effect on the prediction until train.py adds it to
+    FEATURE_COLUMNS and the model is retrained on a dataset that includes it.
     Returns a 0-1 tension value."""
     model = _load_model(model_path)
     row = build_feature_row(camera_summary, weather)
+    if upwind_cloud_cover is not None:
+        row["upwind_cloud_cover"] = upwind_cloud_cover
     X = pd.DataFrame([row], columns=FEATURE_COLUMNS)
     return float(model.predict_proba(X)[0, 1])
 

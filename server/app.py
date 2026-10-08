@@ -1,6 +1,6 @@
 """FastAPI backend: serves /predict (the tension model), /sensor (the
-optional firmware node's Wi-Fi path), and, later, the Earth-mode tile
-proxy (Prompt 9).
+optional firmware node's Wi-Fi path), and /earth/* (Earth mode's NASA GIBS
+satellite tile proxy).
 """
 
 import sys
@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "forecast"))
 from predict import predict_tension  # noqa: E402
 
+import gibs
 from db import get_connection, insert_reading
 from narrator import narrate
 from tts import TTSNotConfigured, synthesize_speech
@@ -35,6 +36,7 @@ class PredictRequest(BaseModel):
     camera: CameraSummary
     lat: float
     lon: float
+    upwind_cloud_cover: Optional[float] = Field(None, ge=0, le=1)
 
 
 class PredictResponse(BaseModel):
@@ -78,7 +80,7 @@ def predict(req: PredictRequest) -> PredictResponse:
         raise HTTPException(status_code=502, detail=f"weather lookup failed: {exc}") from exc
 
     try:
-        tension = predict_tension(req.camera.model_dump(), weather)
+        tension = predict_tension(req.camera.model_dump(), weather, upwind_cloud_cover=req.upwind_cloud_cover)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
@@ -140,6 +142,52 @@ def narrate_speech_endpoint(req: NarrateSpeechRequest) -> Response:
     except TTSNotConfigured as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return Response(content=audio, media_type="audio/wav")
+
+
+@app.get("/earth/regions")
+def earth_regions() -> dict:
+    return {
+        "regions": [
+            {"id": rid, "label": r["label"], "satellite": r["satellite"], "satellite_label": gibs.SATELLITES[r["satellite"]]["label"]}
+            for rid, r in gibs.REGIONS.items()
+        ]
+    }
+
+
+class EarthFramesResponse(BaseModel):
+    satellite: str
+    satellite_label: str
+    tiles: list
+    times: list[str]
+
+
+@app.get("/earth/frames/{region_id}", response_model=EarthFramesResponse)
+def earth_frames(region_id: str, frame_count: int = 8) -> EarthFramesResponse:
+    if region_id not in gibs.REGIONS:
+        raise HTTPException(status_code=404, detail=f"unknown region {region_id!r}")
+    region = gibs.REGIONS[region_id]
+    satellite = region["satellite"]
+    tiles = gibs.region_tile_grid(region_id)
+    try:
+        times = gibs.list_frame_times(gibs.SATELLITES[satellite]["visible"].id, count=frame_count)
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"GIBS capabilities unreachable: {exc}") from exc
+    return EarthFramesResponse(
+        satellite=satellite, satellite_label=gibs.SATELLITES[satellite]["label"], tiles=tiles, times=times
+    )
+
+
+@app.get("/earth/tile/{satellite}/{band}/{time_str}/{z}/{x}/{y}.{ext}")
+def earth_tile(satellite: str, band: str, time_str: str, z: int, x: int, y: int, ext: str) -> Response:
+    if satellite not in gibs.SATELLITES or band not in ("visible", "ir"):
+        raise HTTPException(status_code=404, detail="unknown satellite or band")
+    try:
+        content, content_type = gibs.fetch_tile(satellite, band, time_str, z, x, y)
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"GIBS tile fetch failed: {exc}") from exc
+    if content is None:
+        raise HTTPException(status_code=404, detail="no tile at this position (edge of satellite disk)")
+    return Response(content=content, media_type=content_type)
 
 
 @app.get("/health")

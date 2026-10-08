@@ -26,4 +26,9 @@ Open-Meteo's historical archive data is CC BY 4.0 (reuse with attribution). The 
 `pip install tabpfn`. First run needs a one-time browser login or a `TABPFN_TOKEN` env var to download the model weights (open, non-commercially-licensed). After that it runs fully locally and offline -- no per-call cost, unlike Tinker in `/training`.
 
 ## Optional: upwind_cloud_cover
-A feature slot for Earth-mode satellite data (Prompt 9) is left for later -- not implemented here, since Earth mode doesn't exist yet.
+Earth mode (`/server`'s `gibs.py`) now exists and `/predict` accepts an
+optional `upwind_cloud_cover` field, threaded through `predict_tension()`
+in `predict.py`. It is **not yet in `FEATURE_COLUMNS`** below, so it's
+currently dropped before the model sees it -- wired end-to-end but inert
+until `build_dataset.py`/`train.py` are extended to train on a dataset
+that includes it, and `FEATURE_COLUMNS` is updated to match.
