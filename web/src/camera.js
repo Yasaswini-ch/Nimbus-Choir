@@ -16,6 +16,8 @@ export class CameraSource {
     this.analysisCanvas.height = ANALYSIS_HEIGHT;
     this.analysisCtx = this.analysisCanvas.getContext("2d", { willReadFrequently: true });
     this._timer = null;
+    this._staticImage = null;
+    this._objectUrl = null;
   }
 
   async startCamera() {
@@ -23,6 +25,8 @@ export class CameraSource {
       video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 960 } },
       audio: false,
     });
+    this._staticImage = null;
+    this.video.poster = "";
     this.video.srcObject = stream;
     await this.video.play();
   }
@@ -32,7 +36,23 @@ export class CameraSource {
       for (const track of this.video.srcObject.getTracks()) track.stop();
       this.video.srcObject = null;
     }
-    this.video.src = URL.createObjectURL(file);
+    this._staticImage = null;
+    if (this._objectUrl) URL.revokeObjectURL(this._objectUrl);
+    this._objectUrl = URL.createObjectURL(file);
+
+    if (file.type.startsWith("image/")) {
+      this.video.removeAttribute("src");
+      const img = new Image();
+      img.src = this._objectUrl;
+      await img.decode();
+      this._staticImage = img;
+      // video has no playable source now, so its poster is what's visible on stage
+      this.video.poster = this._objectUrl;
+      return;
+    }
+
+    this.video.poster = "";
+    this.video.src = this._objectUrl;
     this.video.loop = true;
     await this.video.play();
   }
@@ -41,8 +61,12 @@ export class CameraSource {
   run(onFrame) {
     this.stop();
     this._timer = setInterval(() => {
-      if (this.video.readyState < 2) return;
-      this.analysisCtx.drawImage(this.video, 0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+      if (this._staticImage) {
+        this.analysisCtx.drawImage(this._staticImage, 0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+      } else {
+        if (this.video.readyState < 2) return;
+        this.analysisCtx.drawImage(this.video, 0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+      }
       const imageData = this.analysisCtx.getImageData(0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
       onFrame(imageData, this.analysisCanvas);
     }, 1000 / FPS);

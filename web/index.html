@@ -9,34 +9,99 @@
 <link rel="stylesheet" href="/src/style.css">
 </head>
 <body>
+<header class="site-header">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">☁︎</span>
+    <span class="brand-name">Nimbus Choir</span>
+  </div>
+  <nav class="site-nav">
+    <a href="#how-it-works">How it works</a>
+    <a href="#stage">Listen</a>
+    <a href="#controls">Controls</a>
+    <a href="#status-section">Status</a>
+  </nav>
+</header>
+
 <main>
-  <h1>Nimbus Choir</h1>
-  <p class="sub">Point the camera at the sky. Every detected cloud gets tracked and classified, offline, on this device.</p>
+  <section class="hero">
+    <h1>Nimbus Choir</h1>
+    <p class="sub">Point the camera at the sky. Every detected cloud gets tracked and classified into a soft,
+      drifting pad &mdash; offline, on this device, with open-weight models only.</p>
+  </section>
 
-  <div class="stage">
-    <video id="video" playsinline muted></video>
-    <canvas id="overlay"></canvas>
-    <button id="go">Tap to wake the sky</button>
+  <section class="how" id="how-it-works" aria-label="How it works">
+    <h2>How it works</h2>
+    <p class="sub">Every cloud the camera tracks becomes one voice in the choir, mapped straight from what the
+      sky is doing. Try it below once you've read through.</p>
+    <div class="how-grid">
+      <div class="how-card">
+        <span class="how-icon" aria-hidden="true">✺</span>
+        <h3>Cloud type &rarr; timbre</h3>
+        <p>Cirrus, cumulus, stratus and cumulonimbus each hum a different glassy, music-box voice.</p>
+      </div>
+      <div class="how-card">
+        <span class="how-icon" aria-hidden="true">◐</span>
+        <h3>Size &rarr; volume</h3>
+        <p>Bigger clouds swell louder in the mix; small wisps stay a quiet chime in the background.</p>
+      </div>
+      <div class="how-card">
+        <span class="how-icon" aria-hidden="true">↕</span>
+        <h3>Height &rarr; pitch</h3>
+        <p>Higher clouds ring higher notes; low, heavy cloud sits deeper in the pad.</p>
+      </div>
+      <div class="how-card">
+        <span class="how-icon" aria-hidden="true">↔</span>
+        <h3>Position &rarr; pan</h3>
+        <p>A cloud's left-to-right drift across the frame pans its voice across the stereo field.</p>
+      </div>
+      <div class="how-card">
+        <span class="how-icon" aria-hidden="true">≈</span>
+        <h3>Forecast &rarr; tension</h3>
+        <p>A short-term weather forecast sets how consonant or unsettled the whole piece feels.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="layout">
+    <section class="col-main" id="stage" aria-label="Live sky view">
+      <div class="stage">
+        <video id="video" playsinline muted></video>
+        <canvas id="overlay"></canvas>
+        <button id="go">Tap to wake the sky</button>
+      </div>
+      <p class="sub caption" id="narrator-caption"></p>
+    </section>
+
+    <aside class="col-side">
+      <section class="card" id="controls" aria-label="Controls">
+        <h2>Controls</h2>
+        <div class="panel">
+          <label>Sky-mask sensitivity: <b id="sensitivity-value">0.50</b>
+            <input id="sensitivity" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+          <label>Horizon override: <b id="horizon-value">auto</b>
+            <input id="horizon" type="range" min="0" max="1" step="0.01" value="0"></label>
+        </div>
+
+        <div class="row">
+          <button class="b" id="toggle-debug">Debug overlay: on</button>
+          <button class="b" id="toggle-horizon">Horizon: auto</button>
+          <button class="b" id="toggle-narrator">Sky narrator: off</button>
+          <label class="b file-label">Load test video/photo<input id="video-file" type="file" accept="video/*,image/*" hidden></label>
+        </div>
+      </section>
+
+      <section class="card" id="status-section" aria-label="Detection status">
+        <h2>Status</h2>
+        <div class="legend" id="status"></div>
+      </section>
+    </aside>
   </div>
-
-  <div class="panel">
-    <label>Sky-mask sensitivity: <b id="sensitivity-value">0.50</b>
-      <input id="sensitivity" type="range" min="0" max="1" step="0.01" value="0.5"></label>
-    <label>Horizon override: <b id="horizon-value">auto</b>
-      <input id="horizon" type="range" min="0" max="1" step="0.01" value="0"></label>
-  </div>
-
-  <div class="row">
-    <button class="b" id="toggle-debug">Debug overlay: on</button>
-    <button class="b" id="toggle-horizon">Horizon: auto</button>
-    <button class="b" id="toggle-narrator">Sky narrator: off</button>
-    <label class="b file-label">Load test video<input id="video-file" type="file" accept="video/*" hidden></label>
-  </div>
-
-  <p class="sub" id="narrator-caption"></p>
-
-  <div class="legend" id="status"></div>
 </main>
+
+<footer class="site-footer">
+  <p>Offline sky-to-sound instrument &middot; open-weight models only &middot; no photos or GPS leave this device.</p>
+</footer>
+
 <script type="module" src="/src/main.js"></script>
 </body>
 </html>
