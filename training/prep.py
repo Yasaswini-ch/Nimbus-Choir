@@ -85,14 +85,19 @@ def main() -> None:
                 img = Image.open(src).convert("RGB").resize((args.image_size, args.image_size))
                 out_path = out_dir / src.name
                 img.save(out_path)
-                rows.append((str(out_path), cls, split))
+                # relative to prepped_dir, not absolute: an absolute path baked in here only
+                # works on the machine that ran prep.py, breaking the moment the whole
+                # prepped/ folder + manifest.csv get zipped and moved elsewhere (e.g. Colab).
+                # .as_posix() (not str()) so it's forward-slash on every OS -- a Windows-style
+                # backslash path is read back as one bogus path component on Linux.
+                rows.append((out_path.relative_to(prepped_dir).as_posix(), cls, split))
 
                 if split == "train":
                     for i in range(args.augment_per_image):
                         aug = augment_image(img, rng)
                         aug_path = out_dir / f"aug{i}_{src.name}"
                         aug.save(aug_path)
-                        rows.append((str(aug_path), cls, split))
+                        rows.append((aug_path.relative_to(prepped_dir).as_posix(), cls, split))
 
     write_manifest(rows, prepped_dir / "manifest.csv")
     print(f"\nWrote {len(rows)} rows to {prepped_dir / 'manifest.csv'}")

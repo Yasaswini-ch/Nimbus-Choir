@@ -23,8 +23,13 @@ CLASS_INDEX = {c: i for i, c in enumerate(CLASSES)}
 
 
 def read_manifest(path: Path, split: str) -> list[dict]:
+    """manifest.csv stores paths relative to its own directory (see prep.py),
+    so the prepped/ folder + manifest can be zipped and moved to another
+    machine (e.g. uploaded to Colab) without the paths breaking."""
     with open(path, newline="") as f:
         rows = list(csv.DictReader(f))
+    for r in rows:
+        r["path"] = str((path.parent / r["path"]).resolve())
     return [r for r in rows if r["split"] == split]
 
 

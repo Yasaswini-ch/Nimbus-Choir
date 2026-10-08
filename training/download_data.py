@@ -62,6 +62,21 @@ def fetch_ccsn(dest: Path, dry_run: bool) -> Path:
     with zipfile.ZipFile(zip_path) as zf:
         zf.extractall(out_dir)
     zip_path.unlink()
+
+    # Dataverse's "download all files" endpoint bundles each dataset file as its
+    # own entry rather than flattening the archive, so CCSN (itself uploaded as
+    # a single zip) comes out one level deeper than expected: ccsn_raw/CCSN.zip
+    # instead of ccsn_raw/<genus>/. Unwrap any inner zip(s) so map_ccsn_into_classes
+    # finds the genus folders regardless of how Dataverse happened to bundle it.
+    for inner_zip in list(out_dir.glob("*.zip")):
+        print(f"[CCSN] unwrapping nested archive {inner_zip.name} ...")
+        with zipfile.ZipFile(inner_zip) as zf:
+            zf.extractall(out_dir)
+        inner_zip.unlink()
+    macosx_junk = out_dir / "__MACOSX"
+    if macosx_junk.exists():
+        shutil.rmtree(macosx_junk)
+
     return out_dir
 
 

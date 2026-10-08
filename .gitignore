@@ -20,6 +20,9 @@ dist/
 # Generated data / model outputs (reproducible via their scripts)
 /data/raw/
 /data/prepped/
+/data/prepped.zip
+/data/ccsn_raw/
+/data/extra/
 /data/teacher/
 /data/student/
 /forecast/data/
