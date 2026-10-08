@@ -12,7 +12,7 @@ const PIN_HIT_RADIUS_PX = 16;
  * transition on `cloudsEl` (toggled by a class here); this module only
  * draws the globe and resolves clicks.
  */
-export function createGlobePicker({ canvas, cloudsEl, hintEl, onPick }) {
+export function createGlobePicker({ canvas, cloudsEl, hintEl, cancelEl, onPick }) {
   const ctx = canvas.getContext("2d");
   let regions = [];
   let rotationLambda = -20;
@@ -26,13 +26,24 @@ export function createGlobePicker({ canvas, cloudsEl, hintEl, onPick }) {
   }
 
   function resize() {
-    const rect = canvas.getBoundingClientRect();
-    size = Math.min(rect.width, rect.height);
-    if (size <= 0) {
-      // canvas isn't laid out yet (e.g. this very frame it just became visible) -- try again next frame
+    const container = canvas.parentElement;
+    const rect = container.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      // not laid out yet (e.g. this very frame it just became visible) -- try again next frame
       requestAnimationFrame(resize);
       return;
     }
+    // The canvas shares this flex column with the hint text and cancel button below it, so
+    // its square size must respect leftover height too, not just width -- otherwise those
+    // siblings get pushed to overlap the canvas when the stage is short (see commit history).
+    const reservedHeight = (hintEl?.offsetHeight ?? 0) + (cancelEl?.offsetHeight ?? 0) + 24 /* gaps */;
+    size = Math.min(rect.width * 0.72, rect.height - reservedHeight, 320);
+    if (size <= 0) {
+      requestAnimationFrame(resize);
+      return;
+    }
+    canvas.style.width = `${size}px`;
+    canvas.style.height = `${size}px`;
     const dpr = window.devicePixelRatio || 1;
     canvas.width = size * dpr;
     canvas.height = size * dpr;

@@ -303,6 +303,7 @@ const globePicker = createGlobePicker({
   canvas: document.getElementById("globe-canvas"),
   cloudsEl: document.getElementById("globe-clouds"),
   hintEl: globeHintEl,
+  cancelEl: globeCancelButton,
   onPick: async (region) => {
     globePicker.close();
     globePickerEl.hidden = true;

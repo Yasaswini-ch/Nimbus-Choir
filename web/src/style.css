@@ -26,6 +26,9 @@
 html { scroll-padding-top: 76px; scroll-behavior: smooth; height: 100%; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 * { box-sizing: border-box; }
+/* The [hidden] attribute loses to any later rule setting `display` at equal
+   specificity (e.g. `.earth-badge { display: flex }`) -- this keeps it authoritative. */
+[hidden] { display: none !important; }
 body {
   margin: 0; min-height: 100%;
   background: var(--bg2);
@@ -122,7 +125,15 @@ p.caption { min-height: 1.6em; font-style: italic; }
   background: radial-gradient(circle at 50% 45%, rgba(30,20,55,.96), rgba(15,10,35,.99));
 }
 #globe-canvas {
-  width: min(72%, 320px); aspect-ratio: 1; border-radius: 50%; cursor: grab;
+  /* overrides ".stage canvas"'s position:absolute -- this canvas is nested inside .stage
+     but needs to stay in .globe-picker's normal flex flow, stacked above the hint/cancel
+     button below it, not pinned to the stage's corner independent of its siblings.
+     #globe-canvas's id specificity already beats the ".stage canvas" class+type rule. */
+  position: static; inset: auto;
+  /* actual pixel width/height are set in JS (globePicker.js's resize()) as inline styles,
+     which account for the hint text + cancel button sharing this flex column so they
+     never overlap -- inline styles already beat .stage canvas's width/height here too */
+  border-radius: 50%; cursor: grab; flex-shrink: 0;
   box-shadow: 0 0 0 1px rgba(255,255,255,.15), 0 30px 80px rgba(100, 70, 200, .5);
 }
 .globe-hint { margin: 0; color: var(--mute); font-size: .9rem; font-style: italic; }
